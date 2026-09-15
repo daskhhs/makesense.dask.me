@@ -38,8 +38,7 @@ export async function pdfToPlainText(base64Data: string): Promise<{ text: string
     const result = await pdfParse(buffer);
     return { text: result.text.slice(0, 60_000), pageCount: result.numpages };
   } catch (err) {
-    throw new ParseFailedError(
-      err instanceof Error ? `Couldn't read that PDF: ${err.message}` : "Couldn't read that PDF."
-    );
+    console.error("MakeSense: PDF parse failed", err);
+    throw new ParseFailedError("Couldn't read that PDF — try a different file, or paste the text instead.");
   }
 }

@@ -6,58 +6,93 @@ export type ChatMessage = {
 };
 
 export class MissingApiKeyError extends Error {
-  provider: AiProviderName;
-
-  constructor(provider: AiProviderName, envVar: string) {
-    super(
-      `No API key configured for ${provider}. Set ${envVar} in your environment, then try again.`
-    );
+  constructor() {
+    super("No AI API key is configured.");
     this.name = "MissingApiKeyError";
-    this.provider = provider;
   }
 }
 
 export class AiProviderError extends Error {
-  provider: AiProviderName;
-
-  constructor(provider: AiProviderName, message: string) {
+  constructor(message: string) {
     super(message);
     this.name = "AiProviderError";
-    this.provider = provider;
   }
 }
 
-export function getPreferredProvider(): AiProviderName {
-  const raw = (process.env.AI_PROVIDER || "gemini").toLowerCase().trim();
-  if (raw === "groq" || raw === "openrouter" || raw === "gemini") {
-    return raw;
-  }
-  return "gemini";
+const PROVIDER_ENV: Record<AiProviderName, string> = {
+  gemini: "GEMINI_API_KEY",
+  groq: "GROQ_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+};
+
+// Fallback cascade: every configured Gemini key is tried first (in order),
+// then every Groq key, then every OpenRouter key. Each env var may hold a
+// single key or a comma-separated list of keys — this is what lets one
+// account running out of quota fall through to the next automatically,
+// and one provider being down fall through to the next provider.
+const CASCADE_ORDER: AiProviderName[] = ["gemini", "groq", "openrouter"];
+
+function parseKeys(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
+function keysFor(provider: AiProviderName): string[] {
+  return parseKeys(process.env[PROVIDER_ENV[provider]]);
 }
 
 export function getAvailableProviders(): AiProviderName[] {
-  const available: AiProviderName[] = [];
-  if (process.env.GEMINI_API_KEY?.trim()) available.push("gemini");
-  if (process.env.GROQ_API_KEY?.trim()) available.push("groq");
-  if (process.env.OPENROUTER_API_KEY?.trim()) available.push("openrouter");
-  return available;
+  return CASCADE_ORDER.filter((p) => keysFor(p).length > 0);
 }
 
-export function resolveProvider(): AiProviderName | null {
-  const preferred = getPreferredProvider();
-  const available = getAvailableProviders();
-  if (available.length === 0) return null;
-  if (available.includes(preferred)) return preferred;
-  return available[0];
-}
-
-export function providerEnvVar(provider: AiProviderName): string {
+async function callOne(
+  provider: AiProviderName,
+  key: string,
+  messages: ChatMessage[]
+): Promise<string> {
   switch (provider) {
     case "gemini":
-      return "GEMINI_API_KEY";
+      return (await import("./gemini")).callGemini(messages, key);
     case "groq":
-      return "GROQ_API_KEY";
+      return (await import("./groq")).callGroq(messages, key);
     case "openrouter":
-      return "OPENROUTER_API_KEY";
+      return (await import("./openrouter")).callOpenRouter(messages, key);
   }
+}
+
+/**
+ * Tries every configured key across every provider, in a fixed cascade:
+ * all Gemini keys, then all Groq keys, then all OpenRouter keys. Returns
+ * as soon as one succeeds. If every single configured key fails, throws
+ * an AiProviderError describing every attempt; if nothing is configured
+ * at all, throws MissingApiKeyError before making any network call.
+ */
+export async function callAiWithFallback(
+  messages: ChatMessage[]
+): Promise<{ text: string; provider: AiProviderName }> {
+  const providers = getAvailableProviders();
+  if (providers.length === 0) {
+    throw new MissingApiKeyError();
+  }
+
+  const failures: string[] = [];
+
+  for (const provider of CASCADE_ORDER) {
+    const keys = keysFor(provider);
+    for (let i = 0; i < keys.length; i++) {
+      try {
+        const text = await callOne(provider, keys[i], messages);
+        return { text, provider };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        failures.push(`${provider}#${i + 1}: ${msg}`);
+        console.error(`AI fallback: ${provider} key #${i + 1} failed, trying next`, err);
+      }
+    }
+  }
+
+  throw new AiProviderError(`All configured AI providers failed. ${failures.join(" | ")}`);
 }

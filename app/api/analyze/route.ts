@@ -90,10 +90,18 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     if (err instanceof MissingApiKeyError) {
-      return NextResponse.json({ error: err.message, code: "MISSING_API_KEY" }, { status: 503 });
+      console.error("MakeSense: missing API key", err);
+      return NextResponse.json(
+        { error: "This tool isn't fully set up yet — please check back soon.", code: "MISSING_API_KEY" },
+        { status: 503 }
+      );
     }
     if (err instanceof AiProviderError) {
-      return NextResponse.json({ error: err.message, code: "UPSTREAM_ERROR" }, { status: 502 });
+      console.error("MakeSense: upstream AI provider error", err);
+      return NextResponse.json(
+        { error: "Something went wrong while making sense of that. Please try again in a moment.", code: "UPSTREAM_ERROR" },
+        { status: 502 }
+      );
     }
     return NextResponse.json(
       { error: "Couldn't make sense of that source.", code: "UPSTREAM_ERROR" },

@@ -1,21 +1,14 @@
-import { callGemini } from "./ai/gemini";
-import { callGroq } from "./ai/groq";
-import { callOpenRouter } from "./ai/openrouter";
 import {
   AiProviderError,
   MissingApiKeyError,
-  resolveProvider,
-  type AiProviderName,
+  callAiWithFallback,
   type ChatMessage,
 } from "./ai/provider";
 import type { DocumentChunk } from "@/types/document";
 import type { DocumentExplanation, EvidenceType, ExplanationSection } from "@/types/explanation";
 
 export {
-  resolveProvider,
-  getPreferredProvider,
   getAvailableProviders,
-  providerEnvVar,
   MissingApiKeyError,
   AiProviderError,
 } from "./ai/provider";
@@ -69,17 +62,6 @@ function buildUserPrompt(title: string, chunks: DocumentChunk[]): string {
     .join("\n\n---\n\n");
 
   return `Source title: ${title}\n\nSelected excerpts:\n\n${excerpts}`;
-}
-
-async function callProvider(provider: AiProviderName, messages: ChatMessage[]): Promise<string> {
-  switch (provider) {
-    case "gemini":
-      return callGemini(messages);
-    case "groq":
-      return callGroq(messages);
-    case "openrouter":
-      return callOpenRouter(messages);
-  }
 }
 
 function extractJson(text: string): unknown {
@@ -138,18 +120,13 @@ export async function explainDocument(
   title: string,
   chunks: DocumentChunk[]
 ): Promise<DocumentExplanation> {
-  const provider = resolveProvider();
-  if (!provider) {
-    throw new MissingApiKeyError("gemini", "GEMINI_API_KEY");
-  }
-
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: buildUserPrompt(title, chunks) },
   ];
 
   try {
-    const rawText = await callProvider(provider, messages);
+    const { text: rawText, provider } = await callAiWithFallback(messages);
     const raw = extractJson(rawText) as Record<string, unknown>;
     const sections = normalizeSections(raw.sections);
     const resolvedTitle = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : title;
@@ -164,6 +141,6 @@ export async function explainDocument(
       throw err;
     }
     const message = err instanceof Error ? err.message : "Something went sideways making sense of that.";
-    throw new AiProviderError(provider, message);
+    throw new AiProviderError(message);
   }
 }

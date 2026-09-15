@@ -1,18 +1,9 @@
-import {
-  AiProviderError,
-  MissingApiKeyError,
-  type ChatMessage,
-} from "./provider";
+import { AiProviderError, type ChatMessage } from "./provider";
 
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-export async function callGroq(messages: ChatMessage[]): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY?.trim();
-  if (!apiKey) {
-    throw new MissingApiKeyError("groq", "GROQ_API_KEY");
-  }
-
+export async function callGroq(messages: ChatMessage[], apiKey: string): Promise<string> {
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
@@ -33,7 +24,6 @@ export async function callGroq(messages: ChatMessage[]): Promise<string> {
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new AiProviderError(
-      "groq",
       `Groq request failed (${res.status}). ${body.slice(0, 240)}`
     );
   }
@@ -44,7 +34,7 @@ export async function callGroq(messages: ChatMessage[]): Promise<string> {
 
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) {
-    throw new AiProviderError("groq", "Groq returned an empty response.");
+    throw new AiProviderError("Groq returned an empty response.");
   }
 
   return text;

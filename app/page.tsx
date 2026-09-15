@@ -5,10 +5,12 @@ import { AppHeader } from "@/components/AppHeader";
 import { SourceInput } from "@/components/SourceInput";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { Explanation } from "@/components/Explanation";
+import { UploadProgress } from "@/components/UploadProgress";
+import { postJsonWithProgress } from "@/lib/xhr-upload";
 import type { SourceKind } from "@/types/document";
 import type { AnalyzeErrorBody, DocumentExplanation } from "@/types/explanation";
 
-type Status = "idle" | "loading" | "error" | "missing-key" | "result";
+type Status = "idle" | "reading" | "uploading" | "processing" | "loading" | "error" | "missing-key" | "result";
 
 type AnalyzeResult = {
   title: string;
@@ -38,29 +40,51 @@ export default function Home() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResult | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const canSubmit =
     (kind === "url" && url.trim().length > 0) ||
     (kind === "text" && text.trim().length > 0) ||
     (kind === "pdf" && file !== null);
 
+  const isBusy = status === "reading" || status === "uploading" || status === "processing" || status === "loading";
+
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
 
-    setStatus("loading");
     setMessage(null);
     setResult(null);
 
     try {
-      let payload: Record<string, unknown> = { kind };
-      if (kind === "url") {
-        payload = { kind, url: url.trim() };
-      } else if (kind === "text") {
-        payload = { kind, text: text.trim() };
-      } else if (kind === "pdf" && file) {
+      if (kind === "pdf" && file) {
+        setStatus("reading");
+        setUploadProgress(0);
         const pdfBase64 = await fileToBase64(file);
-        payload = { kind, pdfBase64, filename: file.name };
+
+        setStatus("uploading");
+        const res = await postJsonWithProgress<AnalyzeResult | AnalyzeErrorBody>(
+          "/api/analyze",
+          { kind, pdfBase64, filename: file.name },
+          (fraction) => {
+            setUploadProgress(fraction);
+            if (fraction >= 1) setStatus("processing");
+          }
+        );
+
+        if (!res.ok) {
+          const body = res.data as AnalyzeErrorBody;
+          setMessage(body.error);
+          setStatus(body.code === "MISSING_API_KEY" ? "missing-key" : "error");
+          return;
+        }
+
+        setResult(res.data as AnalyzeResult);
+        setStatus("result");
+        return;
       }
+
+      setStatus("loading");
+      const payload = kind === "url" ? { kind, url: url.trim() } : { kind, text: text.trim() };
 
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -109,9 +133,17 @@ export default function Home() {
           fileName={file?.name ?? null}
           onFileSelect={setFile}
           onSubmit={handleSubmit}
-          disabled={status === "loading"}
+          disabled={isBusy}
           canSubmit={canSubmit}
         />
+
+        {(status === "reading" || status === "uploading" || status === "processing") && (
+          <UploadProgress
+            phase={status}
+            progress={status === "uploading" ? uploadProgress : status === "processing" ? 1 : 0}
+            fileName={file?.name}
+          />
+        )}
 
         {status === "loading" && (
           <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--muted)]">
@@ -133,7 +165,7 @@ export default function Home() {
         )}
 
         {status === "result" && result && (
-          <div className="space-y-6 border-t border-[var(--border)] pt-8">
+          <div className="animate-fade-in-up space-y-6 border-t border-[var(--border)] pt-8">
             <h2 className="font-display text-2xl italic text-[var(--ink)]">{result.explanation.title}</h2>
             <DocumentViewer
               title={result.title}

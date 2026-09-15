@@ -1,17 +1,8 @@
-import {
-  AiProviderError,
-  MissingApiKeyError,
-  type ChatMessage,
-} from "./provider";
+import { AiProviderError, type ChatMessage } from "./provider";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
-export async function callGemini(messages: ChatMessage[]): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    throw new MissingApiKeyError("gemini", "GEMINI_API_KEY");
-  }
-
+export async function callGemini(messages: ChatMessage[], apiKey: string): Promise<string> {
   const system = messages
     .filter((m) => m.role === "system")
     .map((m) => m.content)
@@ -43,7 +34,6 @@ export async function callGemini(messages: ChatMessage[]): Promise<string> {
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new AiProviderError(
-      "gemini",
       `Gemini request failed (${res.status}). ${sanitizeUpstream(body)}`
     );
   }
@@ -58,7 +48,7 @@ export async function callGemini(messages: ChatMessage[]): Promise<string> {
     .trim();
 
   if (!text) {
-    throw new AiProviderError("gemini", "Gemini returned an empty response.");
+    throw new AiProviderError("Gemini returned an empty response.");
   }
 
   return text;

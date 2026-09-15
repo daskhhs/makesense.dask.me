@@ -1,21 +1,17 @@
-import {
-  AiProviderError,
-  MissingApiKeyError,
-  type ChatMessage,
-} from "./provider";
+import { AiProviderError, type ChatMessage } from "./provider";
 
-const OPENROUTER_MODEL =
-  process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
+// openrouter/free is OpenRouter's Free Models Router — it randomly selects
+// a free model from whatever's available and is filtered for the features
+// the request needs (e.g. structured JSON output). It's the right default
+// for a last-resort fallback provider. Override with OPENROUTER_MODEL if
+// you'd rather pin a specific (possibly paid) model.
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export async function callOpenRouter(
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  apiKey: string
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
-  if (!apiKey) {
-    throw new MissingApiKeyError("openrouter", "OPENROUTER_API_KEY");
-  }
-
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -38,7 +34,6 @@ export async function callOpenRouter(
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new AiProviderError(
-      "openrouter",
       `OpenRouter request failed (${res.status}). ${body.slice(0, 240)}`
     );
   }
@@ -49,10 +44,7 @@ export async function callOpenRouter(
 
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) {
-    throw new AiProviderError(
-      "openrouter",
-      "OpenRouter returned an empty response."
-    );
+    throw new AiProviderError("OpenRouter returned an empty response.");
   }
 
   return text;

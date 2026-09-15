@@ -68,7 +68,7 @@ export function SourceInput({
           onChange={(e) => onUrlChange(e.target.value)}
           disabled={disabled}
           placeholder="https://docs.example.com/some-concept"
-          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 font-mono text-sm text-[var(--ink)] placeholder:text-[var(--muted)] outline-none transition focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-60"
+          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 font-mono text-base sm:text-sm text-[var(--ink)] placeholder:text-[var(--muted)] outline-none transition focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-60"
         />
       )}
 
@@ -79,7 +79,7 @@ export function SourceInput({
           disabled={disabled}
           rows={8}
           placeholder="Paste the dense paragraph, abstract, or article text here"
-          className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--muted)] outline-none transition focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-60"
+          className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-base sm:text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--muted)] outline-none transition focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-60"
         />
       )}
 
@@ -138,7 +138,7 @@ export function SourceInput({
           type="button"
           onClick={onSubmit}
           disabled={disabled || !canSubmit}
-          className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-fg)] transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-fg)] transition duration-200 hover:bg-[var(--accent-hover)] hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-8px_var(--accent)] active:translate-y-0 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
         >
           Make sense of it
         </button>

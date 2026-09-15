@@ -32,8 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${display.variable} ${body.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-[var(--bg)] text-[var(--ink)]">
-        {children}
+      <body className="relative min-h-full flex flex-col font-sans bg-[var(--bg)] text-[var(--ink)]">
+        <div className="atmosphere" aria-hidden="true" />
+        <div className="relative z-10 flex min-h-full flex-1 flex-col">{children}</div>
       </body>
     </html>
   );
